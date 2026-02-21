@@ -36,6 +36,7 @@
     "remove": "移除"
   },
   "attachments": {
+    "attachFiles": "附加文件",
     "dropFilesHere": "将文件拖放到此处",
     "maxFiles": "每个任务最多 5 个文件",
     "maxFileSize": "每个文件最大 10MB",

@@ -1078,7 +1078,7 @@ export function registerIPCHandlers(): void {
     ): Promise<{ path: string }> => {
       let sizeBytes: number;
       if (payload.isBase64) {
-        sizeBytes = Buffer.from(payload.content, 'base64').length;
+        sizeBytes = Buffer.byteLength(payload.content, 'base64');
       } else {
         sizeBytes = Buffer.byteLength(payload.content, 'utf-8');
       }

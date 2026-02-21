@@ -195,6 +195,14 @@ export default function TaskInputBar({
         return;
       }
       setAttachmentError(null);
+      const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+      if (remainingSlots <= 0) {
+        setAttachmentError(t('attachments.maxFiles'));
+        return;
+      }
+      if (files.length > remainingSlots) {
+        setAttachmentError(t('attachments.maxFiles'));
+      }
       const next = [...attachments];
       for (let i = 0; i < files.length && next.length < MAX_ATTACHMENTS; i++) {
         const file = files[i];
@@ -202,9 +210,6 @@ export default function TaskInputBar({
         if (att && !next.some((a) => a.path === att.path)) {
           next.push(att);
         }
-      }
-      if (next.length > MAX_ATTACHMENTS) {
-        setAttachmentError(t('attachments.maxFiles'));
       }
       setAttachments(next.slice(0, MAX_ATTACHMENTS));
     },
@@ -277,6 +282,16 @@ export default function TaskInputBar({
       textareaRef.current.focus();
     }
   }, [autoFocus]);
+
+  const submitTooltipText = (() => {
+    if (isOverLimit) {
+      return t('buttons.messageTooLong');
+    }
+    if (!value.trim() && attachments.length === 0) {
+      return t('buttons.enterMessage');
+    }
+    return t('buttons.submit');
+  })();
 
   // Auto-submit once the parent value reflects the transcription.
   useEffect(() => {
@@ -462,7 +477,7 @@ export default function TaskInputBar({
             />
             <button
               type="button"
-              aria-label={t('attachments.dropFilesHere')}
+              aria-label={t('attachments.attachFiles')}
               disabled={
                 isDisabled || speechInput.isRecording || attachments.length >= MAX_ATTACHMENTS
               }
@@ -529,13 +544,7 @@ export default function TaskInputBar({
                 </button>
               </TooltipTrigger>
               <TooltipContent>
-                <span>
-                  {isOverLimit
-                    ? t('buttons.messageTooLong')
-                    : !value.trim() && attachments.length === 0
-                      ? t('buttons.enterMessage')
-                      : t('buttons.submit')}
-                </span>
+                <span>{submitTooltipText}</span>
               </TooltipContent>
             </Tooltip>
           </div>

@@ -36,6 +36,7 @@
     "remove": "Remove"
   },
   "attachments": {
+    "attachFiles": "Attach files",
     "dropFilesHere": "Drop files here",
     "maxFiles": "Maximum 5 files per task",
     "maxFileSize": "Maximum 10MB per file",
