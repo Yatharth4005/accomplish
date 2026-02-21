@@ -140,6 +140,10 @@ export default function TaskInputBar({
     async (file: File): Promise<FileAttachment | null> => {
       let filePath = (file as File & { path?: string }).path;
       if (!filePath) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          setAttachmentError(t('attachments.maxFileSize'));
+          return null;
+        }
         const resolve = (
           accomplish as {
             resolveDroppedFile?: (n: string, c: string, b?: boolean) => Promise<{ path: string }>;
@@ -186,7 +190,7 @@ export default function TaskInputBar({
         size: file.size,
       };
     },
-    [t, accomplish],
+    [t, accomplish, setAttachmentError],
   );
 
   const addFiles = useCallback(
