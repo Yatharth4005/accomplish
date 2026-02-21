@@ -285,9 +285,17 @@ export default function TaskInputBar({
     }
     if (pendingAutoSubmitRef.current && value === pendingAutoSubmitRef.current) {
       pendingAutoSubmitRef.current = null;
-      onSubmit(value.trim(), []);
+      const forConfig: TaskInputAttachment[] = attachments.map((a) => ({
+        id: a.id,
+        name: a.name,
+        path: a.path,
+        type: a.type,
+        size: a.size,
+      }));
+      onSubmit(value.trim(), forConfig.length > 0 ? forConfig : undefined);
+      queueMicrotask(() => setAttachments([]));
     }
-  }, [autoSubmitOnTranscription, isDisabled, isOverLimit, onSubmit, value]);
+  }, [autoSubmitOnTranscription, isDisabled, isOverLimit, onSubmit, value, attachments]);
 
   // Auto-resize textarea
   useEffect(() => {

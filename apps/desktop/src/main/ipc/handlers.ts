@@ -1068,6 +1068,7 @@ export function registerIPCHandlers(): void {
   });
 
   const DROPS_TEMP_DIR = path.join(app.getPath('temp'), 'accomplish-drops');
+  const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
   handle(
     'file:resolve-dropped',
@@ -1075,6 +1076,17 @@ export function registerIPCHandlers(): void {
       _event: IpcMainInvokeEvent,
       payload: { name: string; content: string; isBase64?: boolean },
     ): Promise<{ path: string }> => {
+      let sizeBytes: number;
+      if (payload.isBase64) {
+        sizeBytes = Buffer.from(payload.content, 'base64').length;
+      } else {
+        sizeBytes = Buffer.byteLength(payload.content, 'utf-8');
+      }
+      if (sizeBytes > MAX_ATTACHMENT_BYTES) {
+        throw new Error(
+          `Attachment exceeds maximum size of ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB`,
+        );
+      }
       const safeName = path.basename(payload.name).replace(/[^a-zA-Z0-9._-]/g, '_') || 'dropped';
       if (!fs.existsSync(DROPS_TEMP_DIR)) {
         fs.mkdirSync(DROPS_TEMP_DIR, { recursive: true });
@@ -1094,12 +1106,18 @@ export function registerIPCHandlers(): void {
     if (typeof filePath !== 'string' || !filePath) {
       return;
     }
-    const resolved = path.resolve(filePath);
-    const dropsDirResolved = path.resolve(DROPS_TEMP_DIR);
-    if (!resolved.startsWith(dropsDirResolved) || resolved === dropsDirResolved) {
-      return;
-    }
     try {
+      const resolved = path.resolve(filePath);
+      const dropsDirResolved = path.resolve(DROPS_TEMP_DIR);
+      const relative = path.relative(dropsDirResolved, resolved);
+      if (
+        relative === '' ||
+        relative.startsWith('..') ||
+        path.isAbsolute(relative) ||
+        resolved === dropsDirResolved
+      ) {
+        return;
+      }
       if (fs.existsSync(resolved)) {
         fs.unlinkSync(resolved);
       }
