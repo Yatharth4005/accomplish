@@ -1,5 +1,3 @@
-// apps/desktop/src/renderer/components/landing/PlusMenu/index.tsx
-
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Paperclip } from '@phosphor-icons/react';
@@ -39,7 +37,6 @@ export function PlusMenu({
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch enabled skills and connectors when dropdown opens
   useEffect(() => {
     if (open && window.accomplish) {
       window.accomplish
@@ -59,12 +56,10 @@ export function PlusMenu({
     if (!accomplish || isRefreshing) return;
     setIsRefreshing(true);
     try {
-      // Run resync and minimum delay in parallel so animation is visible
       const [, updatedSkills] = await Promise.all([
         new Promise((resolve) => setTimeout(resolve, 600)),
         accomplish.resyncSkills().then(() => accomplish.getEnabledSkills()),
       ]);
-      // Filter out hidden skills for UI display
       setSkills(updatedSkills.filter((s) => !s.isHidden));
     } catch (err) {
       console.error('Failed to refresh skills:', err);
@@ -110,10 +105,10 @@ export function PlusMenu({
         <DropdownMenuTrigger asChild>
           <button
             disabled={disabled}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             title={t('plusMenu.addContent')}
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" weight="light" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[200px]">

@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getAccomplish } from '../../lib/accomplish';
+import { getAccomplish } from '@/lib/accomplish';
 import {
   ArrowBendDownLeft,
   SpinnerGap,
@@ -18,12 +18,13 @@ import type {
   TaskInputAttachment,
   TaskInputAttachmentType,
 } from '@accomplish_ai/agent-core/common';
-import { useSpeechInput } from '../../hooks/useSpeechInput';
-import { SpeechInputButton } from '../ui/SpeechInputButton';
-import { ModelIndicator } from '../ui/ModelIndicator';
+import { useSpeechInput } from '@/hooks/useSpeechInput';
+import { useTypingPlaceholder } from '@/hooks/useTypingPlaceholder';
+import { SpeechInputButton } from '@/components/ui/SpeechInputButton';
+import { ModelIndicator } from '@/components/ui/ModelIndicator';
+import { PlusMenu } from './PlusMenu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PlusMenu } from './PlusMenu';
 
 const MAX_ATTACHMENTS = 5;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -82,47 +83,35 @@ interface TaskInputBarProps {
   /** Called on submit with prompt and optional attachments. */
   onSubmit: (prompt: string, attachments?: TaskInputAttachment[]) => void;
   placeholder?: string;
+  typingPlaceholder?: boolean;
   isLoading?: boolean;
   disabled?: boolean;
   large?: boolean;
   autoFocus?: boolean;
-  /**
-   * Called when user clicks mic button while voice input is not configured
-   * (to open settings dialog)
-   */
   onOpenSpeechSettings?: () => void;
-  /**
-   * Called when user wants to open settings (e.g., from "Manage Skills")
-   */
-  onOpenSettings?: (tab: 'providers' | 'voice' | 'skills' | 'connectors') => void;
-  /**
-   * Called when user wants to open settings to change model
-   */
   onOpenModelSettings?: () => void;
-  /**
-   * Hide model indicator when no model is selected (instead of showing warning)
-   */
   hideModelWhenNoModel?: boolean;
-  /**
-   * Automatically submit after a successful transcription.
-   */
   autoSubmitOnTranscription?: boolean;
+  toolbarLeft?: ReactNode;
+  onOpenSettings?: (tab: 'providers' | 'voice' | 'skills' | 'connectors') => void;
 }
 
-export default function TaskInputBar({
+export function TaskInputBar({
   value,
   onChange,
   onSubmit,
   placeholder = 'Assign a task or ask anything',
+  typingPlaceholder = false,
   isLoading = false,
   disabled = false,
   large: _large = false,
   autoFocus = false,
   onOpenSpeechSettings,
-  onOpenSettings,
   onOpenModelSettings,
   hideModelWhenNoModel = false,
   autoSubmitOnTranscription = true,
+  toolbarLeft,
+  onOpenSettings,
 }: TaskInputBarProps) {
   const { t } = useTranslation('common');
   const [dragOver, setDragOver] = useState(false);
@@ -135,6 +124,11 @@ export default function TaskInputBar({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingAutoSubmitRef = useRef<string | null>(null);
   const accomplish = getAccomplish();
+  const animatedPlaceholder = useTypingPlaceholder({
+    enabled: typingPlaceholder && !value,
+    text: placeholder,
+  });
+  const effectivePlaceholder = typingPlaceholder && !value ? animatedPlaceholder : placeholder;
 
   const fileToAttachment = useCallback(
     async (file: File): Promise<FileAttachment | null> => {
@@ -261,7 +255,6 @@ export default function TaskInputBar({
   // Speech input hook
   const speechInput = useSpeechInput({
     onTranscriptionComplete: (text) => {
-      // Append transcribed text to existing input
       const newValue = value.trim() ? `${value} ${text}` : text;
       onChange(newValue);
 
@@ -269,18 +262,15 @@ export default function TaskInputBar({
         pendingAutoSubmitRef.current = newValue;
       }
 
-      // Auto-focus textarea
       setTimeout(() => {
         textareaRef.current?.focus();
       }, 0);
     },
     onError: (error) => {
       console.error('[Speech] Error:', error.message);
-      // Error is stored in speechInput.error state
     },
   });
 
-  // Auto-focus on mount
   useEffect(() => {
     if (autoFocus && textareaRef.current) {
       textareaRef.current.focus();
@@ -316,7 +306,6 @@ export default function TaskInputBar({
     }
   }, [autoSubmitOnTranscription, isDisabled, isOverLimit, onSubmit, value, attachments]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -332,7 +321,7 @@ export default function TaskInputBar({
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (canSubmit) {
+      if (canSubmit && !speechInput.isRecording) {
         const forConfig: TaskInputAttachment[] = attachments.map((a) => ({
           id: a.id,
           name: a.name,
@@ -367,10 +356,8 @@ export default function TaskInputBar({
       textareaRef.current?.focus();
     }, 0);
   };
-
   return (
     <div className="w-full space-y-2">
-      {/* Error message */}
       {speechInput.error && (
         <Alert
           variant="destructive"
@@ -451,7 +438,7 @@ export default function TaskInputBar({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
+            placeholder={effectivePlaceholder}
             disabled={isDisabled || speechInput.isRecording}
             rows={1}
             className="w-full max-h-[160px] resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -473,28 +460,34 @@ export default function TaskInputBar({
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-border/50">
           {/* Plus Menu and file input trigger on left */}
           <div className="flex items-center gap-1">
-            <PlusMenu
-              onSkillSelect={handleSkillSelect}
-              onOpenSettings={(tab) => onOpenSettings?.(tab)}
-              onAttachFilesClick={() => fileInputRef.current?.click()}
-              disabled={isDisabled || speechInput.isRecording}
-            />
-            <button
-              type="button"
-              aria-label={t('attachments.attachFiles')}
-              disabled={
-                isDisabled || speechInput.isRecording || attachments.length >= MAX_ATTACHMENTS
-              }
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <FileText className="h-4 w-4" />
-            </button>
+            {toolbarLeft || (
+              <>
+                <PlusMenu
+                  onSkillSelect={handleSkillSelect}
+                  onOpenSettings={(tab) => {
+                    if (tab === 'skills' || tab === 'connectors') {
+                      onOpenSettings?.(tab);
+                    }
+                  }}
+                  onAttachFilesClick={() => fileInputRef.current?.click()}
+                  disabled={isDisabled || speechInput.isRecording}
+                />
+                <button
+                  type="button"
+                  aria-label={t('attachments.attachFiles')}
+                  disabled={
+                    isDisabled || speechInput.isRecording || attachments.length >= MAX_ATTACHMENTS
+                  }
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FileText className="h-4 w-4" />
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Right side controls */}
-          <div className="flex items-center gap-2">
-            {/* Model Indicator */}
+          <div className="flex items-center gap-3">
             {onOpenModelSettings && (
               <ModelIndicator
                 isRunning={false}
@@ -503,10 +496,6 @@ export default function TaskInputBar({
               />
             )}
 
-            {/* Divider */}
-            <div className="w-px h-6 bg-border" />
-
-            {/* Speech Input Button */}
             <SpeechInputButton
               isRecording={speechInput.isRecording}
               isTranscribing={speechInput.isTranscribing}
@@ -522,13 +511,13 @@ export default function TaskInputBar({
               size="md"
             />
 
-            {/* Submit button */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   data-testid="task-input-submit"
                   type="button"
                   aria-label={t('buttons.submit')}
+                  title={submitTooltipText}
                   onClick={() => {
                     accomplish.logEvent({
                       level: 'info',
