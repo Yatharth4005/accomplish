@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +34,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const accomplish = useMemo(() => getAccomplish(), []);
   const { t } = useTranslation('home');
+  const attachFilesClickRef = useRef<(() => void) | null>(null);
 
   const useCaseExamples = useMemo(() => {
     return USE_CASE_KEYS.map(({ key, icons }) => ({
@@ -183,9 +184,11 @@ export function HomePage() {
                       setSettingsInitialTab(tab);
                       setShowSettingsDialog(true);
                     }}
+                    onAttachFilesClick={() => attachFilesClickRef.current?.()}
                     disabled={isLoading}
                   />
                 }
+                toolbarLeftInjectRef={attachFilesClickRef}
               />
             </motion.div>
 

@@ -1,6 +1,13 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback, type ReactNode } from 'react';
+import {
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+  type ReactNode,
+  type MutableRefObject,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { getAccomplish } from '@/lib/accomplish';
 import {
@@ -92,7 +99,10 @@ interface TaskInputBarProps {
   onOpenModelSettings?: () => void;
   hideModelWhenNoModel?: boolean;
   autoSubmitOnTranscription?: boolean;
+  /** Left toolbar slot (e.g. PlusMenu). If you need "Attach files" to work, also pass toolbarLeftInjectRef and use it for onAttachFilesClick (e.g. () => toolbarLeftInjectRef.current?.()). */
   toolbarLeft?: ReactNode;
+  /** When provided, we assign the file-picker callback here in an effect so the parent can use it without ref-in-render. */
+  toolbarLeftInjectRef?: MutableRefObject<(() => void) | null>;
   onOpenSettings?: (tab: 'providers' | 'voice' | 'skills' | 'connectors') => void;
 }
 
@@ -111,6 +121,7 @@ export function TaskInputBar({
   hideModelWhenNoModel = false,
   autoSubmitOnTranscription = true,
   toolbarLeft,
+  toolbarLeftInjectRef,
   onOpenSettings,
 }: TaskInputBarProps) {
   const { t } = useTranslation('common');
@@ -230,27 +241,20 @@ export function TaskInputBar({
     [attachments, accomplish],
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDragOver(false);
-      addFiles(e.dataTransfer.files);
-    },
-    [addFiles],
-  );
+  const internalAttachRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const fn = () => fileInputRef.current?.click();
+    internalAttachRef.current = fn;
+    if (toolbarLeftInjectRef) {
+      toolbarLeftInjectRef.current = fn;
+    }
+    return () => {
+      internalAttachRef.current = null;
+      if (toolbarLeftInjectRef) {
+        toolbarLeftInjectRef.current = null;
+      }
+    };
+  }, [toolbarLeftInjectRef]);
 
   // Speech input hook
   const speechInput = useSpeechInput({
@@ -270,6 +274,43 @@ export function TaskInputBar({
       console.error('[Speech] Error:', error.message);
     },
   });
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (isDisabled || speechInput.isRecording) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      setDragOver(true);
+    },
+    [isDisabled, speechInput.isRecording],
+  );
+
+  const handleDragLeave = useCallback(
+    (e: React.DragEvent) => {
+      if (isDisabled || speechInput.isRecording) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      setDragOver(false);
+    },
+    [isDisabled, speechInput.isRecording],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      if (isDisabled || speechInput.isRecording) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      setDragOver(false);
+      addFiles(e.dataTransfer.files);
+    },
+    [addFiles, isDisabled, speechInput.isRecording],
+  );
 
   useEffect(() => {
     if (autoFocus && textareaRef.current) {
@@ -460,7 +501,9 @@ export function TaskInputBar({
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-border/50">
           {/* Plus Menu and file input trigger on left */}
           <div className="flex items-center gap-1">
-            {toolbarLeft || (
+            {toolbarLeft != null ? (
+              toolbarLeft
+            ) : (
               <>
                 <PlusMenu
                   onSkillSelect={handleSkillSelect}
@@ -469,7 +512,7 @@ export function TaskInputBar({
                       onOpenSettings?.(tab);
                     }
                   }}
-                  onAttachFilesClick={() => fileInputRef.current?.click()}
+                  onAttachFilesClick={() => internalAttachRef.current?.()}
                   disabled={isDisabled || speechInput.isRecording}
                 />
                 <button
@@ -478,7 +521,7 @@ export function TaskInputBar({
                   disabled={
                     isDisabled || speechInput.isRecording || attachments.length >= MAX_ATTACHMENTS
                   }
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => internalAttachRef.current?.()}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <FileText className="h-4 w-4" />
